@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generatore di Verifiche - Reti Informatiche V3</title>
+    <!-- Caricamento di Tailwind CSS per lo stile -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Caricamento delle librerie esterne -->
+    <!-- jsPDF per la generazione di PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- JSZip per la compressione in ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Firebase SDK (Incluso come richiesto, sebbene l'app non usi la persistenza per i file) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Configurazione e inizializzazione di Firebase (Boilerplate richiesto)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+        let app, db, auth;
+        let userId = 'anonimo';
+
+        try {
+            if (Object.keys(firebaseConfig).length > 0) {
+                setLogLevel('Debug');
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("Firebase Auth Ready. User ID:", userId);
+                    } else {
+                        console.log("No user signed in. Attempting anonymous sign-in.");
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+            } else {
+                console.log("Firebase config missing. Running in local mode.");
+            }
+        } catch (e) {
+                console.error("Errore nell'inizializzazione di Firebase:", e);
+        }
+    </script>
+    <style>
+        /* Stile personalizzato per l'interfaccia */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .container-card {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: white;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 10px -5px rgba(0, 0, 0, 0.04);
+            border-radius: 1rem;
+        }
+        .input-style {
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            width: 100%;
+            transition: all 0.2s;
+        }
+        .input-style:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+            outline: none;
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #2563eb;
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled {
+            background-color: #93c5fd;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-card">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">
+            Generatore Verifiche: Reti Informatiche (Avanzato)
+        </h1>
+        <p class="text-sm text-gray-600 mb-8">
+            Genera verifiche PDF uniche con domande a difficoltà crescente e **immagini generate dall'AI** per schemi concettuali. Il processo richiederà più tempo a causa della generazione delle immagini.
+        </p>
+
+        <!-- Sezione Dati Generali -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 p-6 bg-blue-50 rounded-lg">
+            <div>
+                <label for="numTests" class="block text-sm font-medium text-gray-700 mb-1">Numero di Verifiche (Max 24)</label>
+                <!-- Aggiornato il limite massimo a 24 -->
+                <input type="number" id="numTests" class="input-style" value="10" min="1" max="24" onchange="updateStudentInputs()">
+            </div>
+            <div>
+                <label for="professor" class="block text-sm font-medium text-gray-700 mb-1">Nome del Professore</label>
+                <input type="text" id="professor" class="input-style" value="Prof. Rossi" placeholder="Es. Prof. Rossi">
+            </div>
+            <div>
+                <label for="class" class="block text-sm font-medium text-gray-700 mb-1">Classe (per identificazione file)</label>
+                <input type="text" id="class" class="input-style" value="4^A Inf." placeholder="Es. 4^A Inf.">
+            </div>
+        </div>
+
+        <!-- Sezione Nomi Alunni -->
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Nomi degli Alunni (Usati solo per nome file unico)</h2>
+        <div id="studentInputs" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            <!-- Gli input degli studenti saranno generati qui -->
+        </div>
+
+        <!-- Bottone di Generazione -->
+        <button id="generateBtn" class="btn-primary w-full shadow-lg hover:shadow-xl" onclick="generateAndZip()">
+            Genera e Scarica File ZIP delle Verifiche
+        </button>
+
+        <!-- Messaggi di Stato -->
+        <div id="message" class="mt-6 text-center text-sm font-medium text-gray-700 hidden">
+            <div class="flex items-center justify-center">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="messageText">Inizializzazione...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Librerie importate globalmente (window.jspdf, window.JSZip)
+        const { jsPDF } = window.jspdf;
+
+        // --- Configurazione Domande con Immagini e Difficoltà ---
+        const IMAGE_Q_ID_1 = 3; // Domanda 3: Topologia
+        const IMAGE_Q_ID_2 = 8; // Domanda 8: Commutazione
+
+        const allQuestions = [
+            // Valutazione 1: [FACILE] Definizione Base
+            { id: 1, text: "Cos'è una rete locale (LAN)? Menziona la sua caratteristica principale in termini di scala dimensionale.", score: 1, category: "Scala dimensionale - 274" },
+            // Valutazione 2: [FACILE] Classificazione Semplice
+            { id: 2, text: "Descrivi la differenza tra una rete WAN (Wide Area Network) e una rete MAN (Metropolitan Area Network) per quanto riguarda l'area geografica che coprono.", score: 2, category: "Reti geografiche - 275" },
+            // Valutazione 3: [MEDIO] Topologie (CON IMMAGINE)
+            { id: IMAGE_Q_ID_1, text: "Descrivi il funzionamento della topologia a 'Stella' (Star). L'immagine qui sotto rappresenta il concetto. Qual è l'elemento centrale che gestisce il traffico e cosa succede se questo elemento si guasta?", score: 3, category: "Topologia delle reti locali - 274", imagePrompt: "Conceptual diagram of a star network topology with central hub and computers. Simple blue and red lines. No text on diagram." },
+            // Valutazione 4: [MEDIO] Concetto di Base
+            { id: 4, text: "Spiega brevemente il concetto di 'Protocollo' in una rete di computer. Fornisci un esempio pratico in un contesto non informatico per illustrarne l'importanza.", score: 4, category: "I protocolli - 280" },
+            // Valutazione 5: [MEDIO-ALTO] Modalità di Trasmissione
+            { id: 5, text: "Spiega la differenza tra le modalità di comunicazione 'Half-Duplex' e 'Full-Duplex' in relazione all'utilizzo del canale. Quale delle due è tipica della comunicazione telefonica bidirezionale moderna?", score: 5, category: "Modalità di utilizzo del canale - 279" },
+            // Valutazione 6: [ALTO] Livello di Base OSI
+            { id: 6, text: "Descrivi la funzione principale del Livello di Collegamento (Data Link Layer) nel modello ISO/OSI e come contribuisce a mascherare le peculiarità del livello fisico sovrastante.", score: 6, category: "Livello di collegamento o data link - 295" },
+            // Valutazione 7: [ALTO] Meccanismi di Accesso
+            { id: 7, text: "Cosa si intende per 'protocollo deterministico' (senza contesa) e 'metodo casuale' (con contesa)? Fornisci un esempio per ciascuno, citando la classificazione delle tecniche di accesso multiplo.", score: 7, category: "Classificazione tecniche di accesso - 283" },
+            // Valutazione 8: [MOLTO ALTO] Commutazione (CON IMMAGINE)
+            { id: IMAGE_Q_ID_2, text: "L'immagine qui sotto illustra due diverse tecniche di commutazione. Spiega la differenza chiave tra Commutazione di Circuito e Commutazione di Pacchetto. Perché la Commutazione di Pacchetto è più efficiente per il traffico 'a burst' di Internet?", score: 8, category: "Commutazione - 286", imagePrompt: "Conceptual diagram illustrating the difference between circuit switching (dedicated path) and packet switching (shared path) with small data blocks. Simple, clean, minimalist illustration." },
+            // Valutazione 9: [COMPLICATISSIMA 1/2] Ragionamento su Architettura
+            { id: 9, text: "Nel modello a strati, un pacchetto (o segmento) destinato a un'applicazione come un browser web passa attraverso tutti i livelli. Spiega, in termini di 'incapsulamento' e 'deincapsulamento', cosa succede al Livello di Trasporto (Transport Layer) e perché è cruciale che questo livello usi le 'porte'.", score: 9, category: "Livello di trasporto - 297, Incapsulamento" },
+            // Valutazione 10: [COMPLICATISSIMA 2/2] Ragionamento su Protocolli e Funzionalità
+            { id: 10, text: "Il protocollo FTP (File Transfer Protocol) opera al Livello Applicazione. Spiega, in dettaglio, **perché** i protocolli di livello applicazione come FTP, pur essendo focalizzati sul servizio utente, **devono necessariamente** affidarsi al Livello di Trasporto (Transport Layer) e specificamente, perché FTP può utilizzare sia TCP (e perché) che, potenzialmente, UDP (e dove sarebbe problematico)?", score: 10, category: "Application layer - 300, Protocolli - 300" }
+        ];
+        // --- Fine Configurazione Domande ---
+
+        /**
+         * Mescola casualmente un array. (Algoritmo di Fisher-Yates)
+         * @param {Array} array
+         * @returns {Array} Array mescolato.
+         */
+        function shuffleArray(array) {
+            let shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        /**
+         * Chiama l'API per generare un'immagine in base al prompt.
+         * @param {string} prompt - Descrizione dettagliata dell'immagine.
+         * @returns {Promise<string>} Immagine in formato Base64 con prefisso data URL.
+         */
+        async function generateImage(prompt) {
+            // Implementazione della generazione immagine AI (immutata)
+            const finalPrompt = `clean, minimalist, conceptual technical diagram of ${prompt}.`;
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+
+            const payload = {
+                instances: {
+                    prompt: finalPrompt
+                },
+                parameters: {
+                    "sampleCount": 1
+                }
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+            } else {
+                console.error("Errore nella generazione dell'immagine o dati mancanti.", result);
+                // Ritorna una placeholder URL in caso di errore
+                return `https://placehold.co/400x150/f0f0f0/666666?text=Errore%20Immagine%20AI`;
+            }
+        }
+
+
+        /**
+         * Aggiorna dinamicamente i campi di input per i nomi degli studenti in base al numero specificato.
+         */
+        function updateStudentInputs() {
+            const numTestsInput = document.getElementById('numTests');
+            let numTests = parseInt(numTestsInput.value);
+            const MAX_TESTS = 24; // Nuovo limite massimo
+
+            // Limita a un massimo di 24
+            if (numTests > MAX_TESTS) {
+                numTests = MAX_TESTS;
+                numTestsInput.value = MAX_TESTS;
+            }
+            if (numTests < 1) {
+                numTests = 1;
+                numTestsInput.value = 1;
+            }
+
+            const container = document.getElementById('studentInputs');
+            container.innerHTML = ''; // Pulisce i vecchi input
+
+            for (let i = 1; i <= numTests; i++) {
+                const div = document.createElement('div');
+                div.className = 'flex items-center space-x-2';
+                div.innerHTML = `
+                    <span class="text-sm font-semibold w-8 text-center bg-gray-200 p-1 rounded-md">${i}</span>
+                    <input type="text" id="studentName_${i}" class="input-style flex-grow" value="Alunno ${i}" placeholder="Nome Alunno ${i}">
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        /**
+         * Genera un singolo PDF per lo studente specificato, inclusa la generazione di immagini.
+         * @param {string} studentName - Nome dello studente (usato solo per nome file).
+         * @param {number} testNumber - Numero progressivo della verifica.
+         * @param {string} professor - Nome del professore.
+         * @param {string} classId - Identificativo della classe.
+         * @param {function} updateMessage - Funzione per aggiornare il messaggio di stato.
+         * @returns {Promise<Blob>} Il Blob del file PDF.
+         */
+        async function generatePDF(studentName, testNumber, professor, classId, updateMessage) {
+            // Genera le due immagini in parallelo
+            updateMessage(`Generazione immagini AI per verifica ${testNumber} in corso...`);
+            
+            const imagePromises = [
+                generateImage(allQuestions.find(q => q.id === IMAGE_Q_ID_1).imagePrompt),
+                generateImage(allQuestions.find(q => q.id === IMAGE_Q_ID_2).imagePrompt)
+            ];
+
+            const [image1, image2] = await Promise.all(imagePromises);
+
+            updateMessage(`Immagini generate. Creazione PDF per ${studentName}...`);
+
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const margin = 15;
+            let currentY = margin;
+            const lineHeight = 7;
+            const maxLineWidth = 210 - 2 * margin;
+
+            // Intestazione del Documento
+            doc.setFont('Helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.text("VERIFICA DI INFORMATICA - LE RETI", 105, currentY, { align: 'center' });
+            currentY += 8;
+
+            doc.setLineWidth(0.5);
+            doc.line(margin, currentY, 210 - margin, currentY); 
+            currentY += 4;
+
+            doc.setFont('Helvetica', 'normal');
+            doc.setFontSize(11);
+
+            // Dati Istituzionali precompilati (Professore e N. Verifica)
+            doc.text(`Professore: ${professor}`, margin, currentY);
+            doc.text(`N. Verifica (ID): ${testNumber}`, maxLineWidth, currentY, { align: 'right' });
+            currentY += lineHeight * 1.5;
+
+            // Dati da compilare dall'alunno (Nome e Cognome, Classe, Data, Indirizzo)
+            doc.setFont('Helvetica', 'normal');
+            doc.setFontSize(11);
+            
+            // Variabili per l'allineamento dei campi
+            const lineLength = 70;
+            const xLabel = margin;
+            const xLineStart = xLabel + 35;
+            const xLabel2 = 120;
+            const xLineStart2 = 145;
+            const lineLength2 = maxLineWidth - xLineStart2;
+
+
+            // Riga 1: Nome e Cognome | Data
+            doc.text("Nome e Cognome:", xLabel, currentY);
+            doc.line(xLineStart, currentY + 0.5, xLineStart + lineLength, currentY + 0.5); 
+            
+            doc.text("Data:", xLabel2, currentY);
+            doc.line(xLineStart2, currentY + 0.5, maxLineWidth, currentY + 0.5); 
+            currentY += lineHeight;
+
+            // Riga 2: Classe | Indirizzo
+            doc.text("Classe:", xLabel, currentY);
+            doc.line(xLineStart, currentY + 0.5, xLineStart + lineLength, currentY + 0.5);
+            
+            doc.text("Indirizzo:", xLabel2, currentY);
+            doc.line(xLineStart2, currentY + 0.5, maxLineWidth, currentY + 0.5); 
+            currentY += lineHeight * 1.5;
+            
+            doc.setLineWidth(0.2);
+            doc.line(margin, currentY, 210 - margin, currentY);
+            currentY += 6;
+
+            // Corpo delle Domande
+            doc.setFont('Helvetica', 'normal');
+            doc.setFontSize(10);
+
+            // Genera una copia mescolata delle domande per l'unicità della verifica
+            const shuffledQuestions = shuffleArray(allQuestions);
+
+            shuffledQuestions.forEach((q, index) => {
+                const questionNum = index + 1;
+                const questionText = `${questionNum}. (${q.score}) ${q.text}`;
+
+                // Calcola l'altezza necessaria per il testo della domanda
+                const textLines = doc.splitTextToSize(questionText, maxLineWidth - 10);
+                let textHeight = textLines.length * 4.5;
+                
+                let imageElement = null;
+                const imageWidth = 80;
+                const imageHeight = 40; 
+                let imageSpace = 0;
+
+                if (q.id === IMAGE_Q_ID_1) {
+                    imageElement = image1;
+                    imageSpace = imageHeight + 5;
+                } else if (q.id === IMAGE_Q_ID_2) {
+                    imageElement = image2;
+                    imageSpace = imageHeight + 5;
+                }
+                
+                // Spazio minimo per la risposta (in mm)
+                const answerSpace = (q.score > 8) ? 40 : 25; // Più spazio per le domande di ragionamento
+
+                // Verifica se è necessaria una nuova pagina
+                if (currentY + textHeight + imageSpace + answerSpace > 280) { 
+                    doc.addPage();
+                    currentY = margin;
+                    doc.setFont('Helvetica', 'bold');
+                    doc.setFontSize(12);
+                    doc.text("VERIFICA (Continua)", 105, currentY, { align: 'center' });
+                    currentY += 8;
+                    doc.setFont('Helvetica', 'normal');
+                    doc.setFontSize(10);
+                }
+
+                // Stampa il testo della domanda
+                doc.text(textLines, margin, currentY);
+                currentY += textHeight + 2;
+
+                // Aggiungi immagine se presente
+                if (imageElement) {
+                    const xCenter = (210 - imageWidth) / 2; // Centra l'immagine
+                    try {
+                        doc.addImage(imageElement, 'PNG', xCenter, currentY, imageWidth, imageHeight);
+                    } catch (e) {
+                         // Aggiunge un placeholder testuale in caso di errore addImage (es. dati non validi)
+                        doc.text(`[Immagine non caricata correttamente per la domanda ${questionNum}]`, margin, currentY + 10);
+                    }
+                    currentY += imageHeight + 5; // Spazio sotto l'immagine
+                }
+
+                // Aggiungi spazio per la risposta
+                doc.setFont('Helvetica', 'italic');
+                doc.setFontSize(9);
+                doc.text("Spazio per la Risposta:", margin + 2, currentY);
+                currentY += 2;
+
+                // Linee per la risposta
+                doc.setDrawColor(200, 200, 200);
+                const numLines = Math.floor(answerSpace / 5);
+                for (let i = 0; i < numLines; i++) {
+                    currentY += 5;
+                    doc.line(margin, currentY, 210 - margin, currentY);
+                }
+
+                currentY += 5; // Spazio tra le domande
+            });
+
+            // --- SEZIONE GRIGLIA DI VALUTAZIONE (Aggiunta) ---
+            
+            // Aggiungi una nuova pagina per la griglia se non c'è spazio sufficiente
+            if (currentY + 60 > 280) { 
+                doc.addPage();
+                currentY = margin;
+            }
+            
+            doc.setDrawColor(0, 0, 0); 
+            doc.setFontSize(9);
+            doc.setFont('Helvetica', 'bold');
+            doc.text("Griglia di Conversione Punteggio (p) / Voto", margin, currentY);
+            currentY += 4;
+            
+            const tableY = currentY;
+            const colWidth = 40;
+            const x1 = margin;
+            const x2 = x1 + colWidth;
+            const x3 = x2 + 10;
+            const x4 = x3 + colWidth;
+            const x5 = x4 + 10; // Ultima colonna VOTO
+
+            const tableData = [
+                ["0 ≤ p < 3,50", "3", "6,60 ≤ p < 7,50", "7"],
+                ["3,60 ≤ p < 4,50", "4", "7,60 ≤ p < 8,50", "8"],
+                ["4,60 ≤ p < 5,50", "5", "8,60 ≤ p < 9,50", "9"],
+                ["5,60 ≤ p < 6,50", "6", "9,60 ≤ p ≤ 10", "10"], // Modificato per includere 10
+            ];
+            
+            doc.setFont('Helvetica', 'normal');
+            let cellY = tableY;
+            
+            // Intestazione Tabella
+            doc.setLineWidth(0.2);
+            doc.setDrawColor(0, 0, 0);
+            doc.setFillColor(220, 230, 240);
+            doc.setFontSize(8);
+            doc.setFont('Helvetica', 'bold');
+            
+            // Colonna 1
+            doc.rect(x1, cellY, colWidth, 5, 'F');
+            doc.text("INDICATORI (Punti)", x1 + colWidth / 2, cellY + 3.5, { align: 'center' });
+            // Colonna 2
+            doc.rect(x2, cellY, 10, 5, 'F');
+            doc.text("VOTO", x2 + 5, cellY + 3.5, { align: 'center' });
+            // Colonna 3
+            doc.rect(x3, cellY, colWidth, 5, 'F');
+            doc.text("INDICATORI (Punti)", x3 + colWidth / 2, cellY + 3.5, { align: 'center' });
+            // Colonna 4
+            doc.rect(x4, cellY, 10, 5, 'F');
+            doc.text("VOTO", x4 + 5, cellY + 3.5, { align: 'center' });
+            cellY += 5;
+            
+            doc.setFont('Helvetica', 'normal');
+            doc.setFontSize(9);
+
+            tableData.forEach(row => {
+                // Disegna e riempie le celle
+                doc.rect(x1, cellY, colWidth, 5);
+                doc.rect(x2, cellY, 10, 5);
+                doc.rect(x3, cellY, colWidth, 5);
+                doc.rect(x4, cellY, 10, 5);
+
+                // Aggiungi il testo
+                doc.text(`Da ${row[0]}`, x1 + 2, cellY + 3.5);
+                doc.text(row[1], x2 + 5, cellY + 3.5, { align: 'center' });
+                doc.text(`Da ${row[2]}`, x3 + 2, cellY + 3.5);
+                doc.text(row[3], x4 + 5, cellY + 3.5, { align: 'center' });
+                
+                cellY += 5;
+            });
+            
+            currentY = cellY + 8;
+            // --- FINE SEZIONE GRIGLIA DI VALUTAZIONE ---
+
+
+            // --- SEZIONE FOOTER ---
+            const footerY1 = 285; 
+            const footerY2 = 289; 
+            const footerY3 = 293; 
+
+            // Linea separatrice (riposizionata in fondo pagina)
+            doc.setLineWidth(0.1);
+            doc.setDrawColor(0, 0, 0); 
+            doc.line(margin, footerY1 - 2, 210 - margin, footerY1 - 2); 
+
+            doc.setFontSize(9);
+            
+            // 1. Verifica del Professore
+            doc.setFont('Helvetica', 'bold');
+            doc.text(`Verifica del Professore: ${professor}`, margin, footerY1 + 1);
+
+            // 2. Verifica di Informatica
+            doc.setFont('Helvetica', 'italic');
+            doc.text("Verifica di Informatica", margin, footerY2 + 1);
+
+            // 3. Informazioni sui Punti/Argomento (centrate)
+            doc.setFont('Helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.text("Totale Punti: 10 (Valutazione concettuale per difficoltà) - Argomento: Reti Informatiche", 105, footerY3 + 1, { align: 'center' });
+            // --- FINE SEZIONE FOOTER ---
+
+            return doc.output('blob');
+        }
+
+        /**
+         * Funzione principale per raccogliere i dati, generare i PDF e creare il file ZIP.
+         */
+        async function generateAndZip() {
+            const numTests = parseInt(document.getElementById('numTests').value);
+            const professor = document.getElementById('professor').value.trim();
+            const classId = document.getElementById('class').value.trim();
+            const messageDiv = document.getElementById('message');
+            const messageText = document.getElementById('messageText');
+            const generateBtn = document.getElementById('generateBtn');
+
+            // Validazione minima
+            if (numTests < 1 || !professor || !classId) {
+                messageText.textContent = 'Errore: Compila tutti i campi.';
+                messageDiv.classList.remove('hidden');
+                messageDiv.classList.add('text-red-600');
+                return;
+            }
+
+            messageDiv.classList.remove('text-red-600');
+            generateBtn.disabled = true;
+            messageDiv.classList.remove('hidden');
+            messageText.textContent = 'Inizializzazione e preparazione dei file...';
+
+            const zip = new window.JSZip();
+            let hasError = false;
+
+            for (let i = 1; i <= numTests; i++) {
+                const studentInput = document.getElementById(`studentName_${i}`);
+                // Il nome dello studente viene usato solo per dare un nome univoco al file
+                const studentName = studentInput ? studentInput.value.trim() : `Alunno Senza Nome ${i}`; 
+
+                const updateMessage = (msg) => {
+                    messageText.textContent = `[${i}/${numTests}] ${studentName}: ${msg}`;
+                };
+
+                if (studentName) {
+                    try {
+                        const pdfBlob = await generatePDF(studentName, i, professor, classId, updateMessage);
+                        const safeFileName = `Verifica_${classId.replace(/[^a-zA-Z0-9]/g, '_')}_${i}_${studentName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+                        zip.file(safeFileName, pdfBlob);
+
+                    } catch (error) {
+                        messageText.textContent = `Errore critico durante la generazione della verifica ${i}. Controlla la console.`;
+                        console.error(error);
+                        hasError = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!hasError) {
+                messageText.textContent = 'Creazione file ZIP in corso... Attendere.';
+                // Genera il file ZIP
+                zip.generateAsync({ type: "blob" })
+                    .then(function(content) {
+                        const downloadLink = document.createElement('a');
+                        downloadLink.href = URL.createObjectURL(content);
+                        downloadLink.download = `Verifiche_Reti_Avanzate_${classId.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.zip`;
+                        document.body.appendChild(downloadLink);
+                        downloadLink.click();
+                        document.body.removeChild(downloadLink);
+
+                        messageText.textContent = 'Generazione completata! Download avviato.';
+                        setTimeout(() => {
+                            messageDiv.classList.add('hidden');
+                            generateBtn.disabled = false;
+                        }, 2000);
+                    })
+                    .catch(e => {
+                        messageText.textContent = `Errore nella compressione ZIP: ${e.message}`;
+                        console.error(e);
+                        generateBtn.disabled = false;
+                    });
+            } else {
+                generateBtn.disabled = false;
+            }
+        }
+
+        // Inizializza gli input degli studenti all'avvio
+        window.onload = function() {
+            updateStudentInputs();
+        };
+
+    </script>
+</body>
+</html>
