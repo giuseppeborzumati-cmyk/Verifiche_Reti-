@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generatore di Verifiche - Reti Informatiche V3</title>
+    <title>Generatore di Verifiche - Reti Informatiche V4</title>
     <!-- Caricamento di Tailwind CSS per lo stile -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Caricamento delle librerie esterne -->
@@ -11,7 +11,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- JSZip per la compressione in ZIP -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <!-- Firebase SDK (Incluso come richiesto, sebbene l'app non usi la persistenza per i file) -->
+    <!-- Firebase SDK (Boilerplate richiesto) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -103,15 +103,14 @@
             Generatore Verifiche: Reti Informatiche (Avanzato)
         </h1>
         <p class="text-sm text-gray-600 mb-8">
-            Genera verifiche PDF uniche con domande a difficoltà crescente e **immagini generate dall'AI** per schemi concettuali. Il processo richiederà più tempo a causa della generazione delle immagini.
+            Genera fino a 24 verifiche PDF uniche con domande a difficoltà crescente, immagini AI e una griglia di valutazione dettagliata inclusa.
         </p>
 
         <!-- Sezione Dati Generali -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 p-6 bg-blue-50 rounded-lg">
             <div>
                 <label for="numTests" class="block text-sm font-medium text-gray-700 mb-1">Numero di Verifiche (Max 24)</label>
-                <!-- Aggiornato il limite massimo a 24 -->
-                <input type="number" id="numTests" class="input-style" value="10" min="1" max="24" onchange="updateStudentInputs()">
+                <input type="number" id="numTests" class="input-style" value="10" min="1" max="24">
             </div>
             <div>
                 <label for="professor" class="block text-sm font-medium text-gray-700 mb-1">Nome del Professore</label>
@@ -122,12 +121,8 @@
                 <input type="text" id="class" class="input-style" value="4^A Inf." placeholder="Es. 4^A Inf.">
             </div>
         </div>
-
-        <!-- Sezione Nomi Alunni -->
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">Nomi degli Alunni (Usati solo per nome file unico)</h2>
-        <div id="studentInputs" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            <!-- Gli input degli studenti saranno generati qui -->
-        </div>
+        
+        <!-- Il div studentInputs è stato rimosso come richiesto -->
 
         <!-- Bottone di Generazione -->
         <button id="generateBtn" class="btn-primary w-full shadow-lg hover:shadow-xl" onclick="generateAndZip()">
@@ -176,7 +171,25 @@
             // Valutazione 10: [COMPLICATISSIMA 2/2] Ragionamento su Protocolli e Funzionalità
             { id: 10, text: "Il protocollo FTP (File Transfer Protocol) opera al Livello Applicazione. Spiega, in dettaglio, **perché** i protocolli di livello applicazione come FTP, pur essendo focalizzati sul servizio utente, **devono necessariamente** affidarsi al Livello di Trasporto (Transport Layer) e specificamente, perché FTP può utilizzare sia TCP (e perché) che, potenzialmente, UDP (e dove sarebbe problematico)?", score: 10, category: "Application layer - 300, Protocolli - 300" }
         ];
-        // --- Fine Configurazione Domande ---
+
+        const tableDataConversion = [
+            ["0 ≤ p < 3,50", "3", "6,60 ≤ p < 7,50", "7"],
+            ["3,60 ≤ p < 4,50", "4", "7,60 ≤ p < 8,50", "8"],
+            ["4,60 ≤ p < 5,50", "5", "8,60 ≤ p < 9,50", "9"],
+            ["5,60 ≤ p < 6,50", "6", "9,60 ≤ p ≤ 10", "10"],
+        ];
+        
+        const rubricData = [
+            { vote: '10', descriptor: "L'alunna/o dimostra una comprensione eccellente di tutti gli argomenti trattati. Le risposte sono corrette e complete, con spiegazioni dettagliate e precise nelle domande aperte. Usa un linguaggio tecnico corretto e mostra padronanza completa delle nozioni richieste. Non sono presenti errori." },
+            { vote: '9', descriptor: "L'alunna/o dimostra una buona comprensione degli argomenti. Le risposte sono quasi tutte corrette. Le domande aperte sono ben sviluppate, con alcuni dettagli non del tutto completi. Usa in modo corretto il linguaggio tecnico, con qualche imprecisione marginale." },
+            { vote: '8', descriptor: "L'alunna/o dimostra una comprensione soddisfacente degli argomenti. Le risposte sono corrette in gran parte. Le domande aperte sono sufficientemente sviluppate, ma mancano approfondimenti significativi. Qualche errore nelle risposte chiuse e nei completamenti. Linguaggio tecnico semplice ma comprensibile." },
+            { vote: '7', descriptor: "L'alunna/o mostra una comprensione accettabile, ma con alcune lacune. Le risposte sono corrette solo in parte. Le domande aperte sono parzialmente sviluppate o poco articulate. Si notano alcune imprecisioni o errori significativi nelle risposte chiuse. Uso limitato e non sempre corretto del linguaggio tecnico." },
+            { vote: '6', descriptor: "L'alunna/o dimostra difficoltà evidenti. Le risposte sono in parte corrette, ma le domande aperte sono incomplete o trattano solo superficialmente gli argomenti richiesti. Errori frequenti nelle risposte chiuse e nei completamenti. Linguaggio tecnico carente." },
+            { vote: '5', descriptor: "L'alunna/o dimostra una comprensione parziale degli argomenti. Le domande aperte sono molto incomplete o fuori tema. Gli errori nelle risposte chiuse sono prevalenti. Non usa correttamente il linguaggio tecnico." },
+            { vote: '4', descriptor: "L'alunna/o dimostra una comprensione limitata degli argomenti. Le domande aperte non sono sviluppate e contengono errori concettuali gravi. Le risposte chiuse sono in gran parte errate. Il linguaggio tecnico è assente o usato in modo scorretto." },
+            { vote: '3 o meno', descriptor: "L'alunna/o dimostra una comprensione fortemente insufficiente degli argomenti. Le domande aperte sono assenti o del tutto errate. Errori diffusi e mancanza completa di utilizzo del linguaggio tecnico." }
+        ];
+        // --- Fine Configurazione Domande e Griglie ---
 
         /**
          * Mescola casualmente un array. (Algoritmo di Fisher-Yates)
@@ -198,7 +211,6 @@
          * @returns {Promise<string>} Immagine in formato Base64 con prefisso data URL.
          */
         async function generateImage(prompt) {
-            // Implementazione della generazione immagine AI (immutata)
             const finalPrompt = `clean, minimalist, conceptual technical diagram of ${prompt}.`;
             const apiKey = "AIzaSyAiBWRktB21R-pTasn1TuQ5fJJqghptCHU";
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
@@ -224,54 +236,147 @@
                 return `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
             } else {
                 console.error("Errore nella generazione dell'immagine o dati mancanti.", result);
-                // Ritorna una placeholder URL in caso di errore
                 return `https://placehold.co/400x150/f0f0f0/666666?text=Errore%20Immagine%20AI`;
             }
         }
 
-
         /**
-         * Aggiorna dinamicamente i campi di input per i nomi degli studenti in base al numero specificato.
+         * Disegna la griglia di conversione Voto/Punti.
+         * @param {jsPDF} doc - Istanza di jsPDF.
+         * @param {number} startY - Coordinata Y di partenza.
+         * @param {number} margin - Margine laterale.
+         * @returns {number} La nuova coordinata Y.
          */
-        function updateStudentInputs() {
-            const numTestsInput = document.getElementById('numTests');
-            let numTests = parseInt(numTestsInput.value);
-            const MAX_TESTS = 24; // Nuovo limite massimo
+        function drawConversionTable(doc, startY, margin) {
+            let currentY = startY;
+            
+            doc.setDrawColor(0, 0, 0); 
+            doc.setFontSize(9);
+            doc.setFont('Helvetica', 'bold');
+            doc.text("Griglia di Conversione Punteggio (p) / Voto", margin, currentY);
+            currentY += 4;
+            
+            const tableY = currentY;
+            const colWidth = 40;
+            const voteWidth = 10;
+            const x1 = margin;
+            const x2 = x1 + colWidth;
+            const x3 = x2 + voteWidth + 5; // Spazio tra le due tabelle
+            const x4 = x3 + colWidth;
 
-            // Limita a un massimo di 24
-            if (numTests > MAX_TESTS) {
-                numTests = MAX_TESTS;
-                numTestsInput.value = MAX_TESTS;
-            }
-            if (numTests < 1) {
-                numTests = 1;
-                numTestsInput.value = 1;
-            }
+            doc.setFontSize(8);
+            doc.setFont('Helvetica', 'bold');
+            doc.setLineWidth(0.2);
+            doc.setFillColor(220, 230, 240);
+            
+            let cellY = tableY;
+            const rowHeight = 5;
 
-            const container = document.getElementById('studentInputs');
-            container.innerHTML = ''; // Pulisce i vecchi input
+            // Intestazione Tabella 1
+            doc.rect(x1, cellY, colWidth, rowHeight, 'F');
+            doc.text("INDICATORI (Punti)", x1 + colWidth / 2, cellY + 3.5, { align: 'center' });
+            doc.rect(x2, cellY, voteWidth, rowHeight, 'F');
+            doc.text("VOTO", x2 + voteWidth / 2, cellY + 3.5, { align: 'center' });
+            
+            // Intestazione Tabella 2
+            doc.rect(x3, cellY, colWidth, rowHeight, 'F');
+            doc.text("INDICATORI (Punti)", x3 + colWidth / 2, cellY + 3.5, { align: 'center' });
+            doc.rect(x4, cellY, voteWidth, rowHeight, 'F');
+            doc.text("VOTO", x4 + voteWidth / 2, cellY + 3.5, { align: 'center' });
+            cellY += rowHeight;
+            
+            doc.setFont('Helvetica', 'normal');
+            doc.setFontSize(9);
 
-            for (let i = 1; i <= numTests; i++) {
-                const div = document.createElement('div');
-                div.className = 'flex items-center space-x-2';
-                div.innerHTML = `
-                    <span class="text-sm font-semibold w-8 text-center bg-gray-200 p-1 rounded-md">${i}</span>
-                    <input type="text" id="studentName_${i}" class="input-style flex-grow" value="Alunno ${i}" placeholder="Nome Alunno ${i}">
-                `;
-                container.appendChild(div);
-            }
+            tableDataConversion.forEach(row => {
+                // Disegna e riempie le celle
+                doc.rect(x1, cellY, colWidth, rowHeight);
+                doc.rect(x2, cellY, voteWidth, rowHeight);
+                doc.rect(x3, cellY, colWidth, rowHeight);
+                doc.rect(x4, cellY, voteWidth, rowHeight);
+
+                // Aggiungi il testo
+                doc.text(`Da ${row[0]}`, x1 + 2, cellY + 3.5);
+                doc.text(row[1], x2 + voteWidth / 2, cellY + 3.5, { align: 'center' });
+                doc.text(`Da ${row[2]}`, x3 + 2, cellY + 3.5);
+                doc.text(row[3], x4 + voteWidth / 2, cellY + 3.5, { align: 'center' });
+                
+                cellY += rowHeight;
+            });
+            
+            return cellY + 8; // Ritorna la nuova Y per il contenuto successivo
         }
 
+
         /**
-         * Genera un singolo PDF per lo studente specificato, inclusa la generazione di immagini.
-         * @param {string} studentName - Nome dello studente (usato solo per nome file).
+         * Disegna la griglia descrittiva (rubrica) per l'attribuzione del voto.
+         * @param {jsPDF} doc - Istanza di jsPDF.
+         * @param {number} startY - Coordinata Y di partenza.
+         * @param {number} margin - Margine laterale.
+         * @param {number} maxLineWidth - Larghezza massima di scrittura.
+         * @returns {number} La nuova coordinata Y.
+         */
+        function drawRubricTable(doc, startY, margin, maxLineWidth) {
+            let currentY = startY;
+            
+            doc.setFontSize(11);
+            doc.setFont('Helvetica', 'bold');
+            doc.text("Griglia Descrittiva per l'Attribuzione del Voto", margin, currentY);
+            currentY += 8;
+            
+            const colVoteWidth = 25; // Larghezza colonna Voto
+            const colDescWidth = maxLineWidth - colVoteWidth; // Larghezza colonna Descrittori
+            
+            doc.setFontSize(9);
+            doc.setLineWidth(0.2);
+            doc.setFillColor(220, 230, 240);
+            
+            // Intestazione
+            doc.setFont('Helvetica', 'bold');
+            let cellY = currentY;
+            doc.rect(margin, cellY, colVoteWidth, 5, 'F');
+            doc.text("VOTO", margin + colVoteWidth / 2, cellY + 3.5, { align: 'center' });
+            
+            doc.rect(margin + colVoteWidth, cellY, colDescWidth, 5, 'F');
+            doc.text("DESCRITTORI", margin + colVoteWidth + colDescWidth / 2, cellY + 3.5, { align: 'center' });
+            cellY += 5;
+            
+            doc.setFont('Helvetica', 'normal');
+
+            rubricData.forEach(item => {
+                const descriptorLines = doc.splitTextToSize(item.descriptor, colDescWidth - 2);
+                const descHeight = descriptorLines.length * 4.5;
+                const rowHeight = Math.max(7, descHeight + 2); // Altezza minima 7
+                
+                // Disegna le celle
+                doc.rect(margin, cellY, colVoteWidth, rowHeight);
+                doc.rect(margin + colVoteWidth, cellY, colDescWidth, rowHeight);
+                
+                // Aggiungi Voto (centrato verticalmente)
+                doc.setFont('Helvetica', 'bold');
+                doc.text(item.vote, margin + colVoteWidth / 2, cellY + rowHeight / 2 + 1, { align: 'center' });
+                
+                // Aggiungi Descrittore
+                doc.setFont('Helvetica', 'normal');
+                doc.text(descriptorLines, margin + colVoteWidth + 1, cellY + 3.5);
+                
+                cellY += rowHeight;
+            });
+
+            return cellY + 8;
+        }
+
+
+        /**
+         * Genera un singolo PDF per la verifica, inclusa la generazione di immagini.
+         * @param {string} studentNamePlaceholder - Placeholder per i messaggi.
          * @param {number} testNumber - Numero progressivo della verifica.
          * @param {string} professor - Nome del professore.
          * @param {string} classId - Identificativo della classe.
          * @param {function} updateMessage - Funzione per aggiornare il messaggio di stato.
          * @returns {Promise<Blob>} Il Blob del file PDF.
          */
-        async function generatePDF(studentName, testNumber, professor, classId, updateMessage) {
+        async function generatePDF(studentNamePlaceholder, testNumber, professor, classId, updateMessage) {
             // Genera le due immagini in parallelo
             updateMessage(`Generazione immagini AI per verifica ${testNumber} in corso...`);
             
@@ -282,7 +387,7 @@
 
             const [image1, image2] = await Promise.all(imagePromises);
 
-            updateMessage(`Immagini generate. Creazione PDF per ${studentName}...`);
+            updateMessage(`Immagini generate. Creazione PDF per ${studentNamePlaceholder}...`);
 
             const doc = new jsPDF('p', 'mm', 'a4');
             const margin = 15;
@@ -318,8 +423,6 @@
             const xLineStart = xLabel + 35;
             const xLabel2 = 120;
             const xLineStart2 = 145;
-            const lineLength2 = maxLineWidth - xLineStart2;
-
 
             // Riga 1: Nome e Cognome | Data
             doc.text("Nome e Cognome:", xLabel, currentY);
@@ -417,88 +520,22 @@
                 currentY += 5; // Spazio tra le domande
             });
 
-            // --- SEZIONE GRIGLIA DI VALUTAZIONE (Aggiunta) ---
+            // --- GRIGLIA DI CONVERSIONE (Prima dell'ultima pagina) ---
+            doc.addPage();
+            currentY = margin;
+            currentY = drawConversionTable(doc, currentY, margin);
             
-            // Aggiungi una nuova pagina per la griglia se non c'è spazio sufficiente
-            if (currentY + 60 > 280) { 
-                doc.addPage();
-                currentY = margin;
-            }
-            
-            doc.setDrawColor(0, 0, 0); 
-            doc.setFontSize(9);
-            doc.setFont('Helvetica', 'bold');
-            doc.text("Griglia di Conversione Punteggio (p) / Voto", margin, currentY);
-            currentY += 4;
-            
-            const tableY = currentY;
-            const colWidth = 40;
-            const x1 = margin;
-            const x2 = x1 + colWidth;
-            const x3 = x2 + 10;
-            const x4 = x3 + colWidth;
-            const x5 = x4 + 10; // Ultima colonna VOTO
-
-            const tableData = [
-                ["0 ≤ p < 3,50", "3", "6,60 ≤ p < 7,50", "7"],
-                ["3,60 ≤ p < 4,50", "4", "7,60 ≤ p < 8,50", "8"],
-                ["4,60 ≤ p < 5,50", "5", "8,60 ≤ p < 9,50", "9"],
-                ["5,60 ≤ p < 6,50", "6", "9,60 ≤ p ≤ 10", "10"], // Modificato per includere 10
-            ];
-            
-            doc.setFont('Helvetica', 'normal');
-            let cellY = tableY;
-            
-            // Intestazione Tabella
-            doc.setLineWidth(0.2);
-            doc.setDrawColor(0, 0, 0);
-            doc.setFillColor(220, 230, 240);
-            doc.setFontSize(8);
-            doc.setFont('Helvetica', 'bold');
-            
-            // Colonna 1
-            doc.rect(x1, cellY, colWidth, 5, 'F');
-            doc.text("INDICATORI (Punti)", x1 + colWidth / 2, cellY + 3.5, { align: 'center' });
-            // Colonna 2
-            doc.rect(x2, cellY, 10, 5, 'F');
-            doc.text("VOTO", x2 + 5, cellY + 3.5, { align: 'center' });
-            // Colonna 3
-            doc.rect(x3, cellY, colWidth, 5, 'F');
-            doc.text("INDICATORI (Punti)", x3 + colWidth / 2, cellY + 3.5, { align: 'center' });
-            // Colonna 4
-            doc.rect(x4, cellY, 10, 5, 'F');
-            doc.text("VOTO", x4 + 5, cellY + 3.5, { align: 'center' });
-            cellY += 5;
-            
-            doc.setFont('Helvetica', 'normal');
-            doc.setFontSize(9);
-
-            tableData.forEach(row => {
-                // Disegna e riempie le celle
-                doc.rect(x1, cellY, colWidth, 5);
-                doc.rect(x2, cellY, 10, 5);
-                doc.rect(x3, cellY, colWidth, 5);
-                doc.rect(x4, cellY, 10, 5);
-
-                // Aggiungi il testo
-                doc.text(`Da ${row[0]}`, x1 + 2, cellY + 3.5);
-                doc.text(row[1], x2 + 5, cellY + 3.5, { align: 'center' });
-                doc.text(`Da ${row[2]}`, x3 + 2, cellY + 3.5);
-                doc.text(row[3], x4 + 5, cellY + 3.5, { align: 'center' });
-                
-                cellY += 5;
-            });
-            
-            currentY = cellY + 8;
-            // --- FINE SEZIONE GRIGLIA DI VALUTAZIONE ---
+            // --- GRIGLIA DESCRITTIVA (Rubrica) ---
+            currentY = drawRubricTable(doc, currentY, margin, maxLineWidth);
 
 
             // --- SEZIONE FOOTER ---
+            // Torna all'ultima pagina (quella con le griglie) per il footer
             const footerY1 = 285; 
             const footerY2 = 289; 
             const footerY3 = 293; 
 
-            // Linea separatrice (riposizionata in fondo pagina)
+            // Linea separatrice
             doc.setLineWidth(0.1);
             doc.setDrawColor(0, 0, 0); 
             doc.line(margin, footerY1 - 2, 210 - margin, footerY1 - 2); 
@@ -526,12 +563,20 @@
          * Funzione principale per raccogliere i dati, generare i PDF e creare il file ZIP.
          */
         async function generateAndZip() {
-            const numTests = parseInt(document.getElementById('numTests').value);
+            const numTestsInput = document.getElementById('numTests');
+            let numTests = parseInt(numTestsInput.value);
             const professor = document.getElementById('professor').value.trim();
             const classId = document.getElementById('class').value.trim();
             const messageDiv = document.getElementById('message');
             const messageText = document.getElementById('messageText');
             const generateBtn = document.getElementById('generateBtn');
+            const MAX_TESTS = 24;
+
+            // Assicurati che il numero sia all'interno dei limiti
+            if (numTests > MAX_TESTS) {
+                numTests = MAX_TESTS;
+                numTestsInput.value = MAX_TESTS;
+            }
 
             // Validazione minima
             if (numTests < 1 || !professor || !classId) {
@@ -550,26 +595,23 @@
             let hasError = false;
 
             for (let i = 1; i <= numTests; i++) {
-                const studentInput = document.getElementById(`studentName_${i}`);
-                // Il nome dello studente viene usato solo per dare un nome univoco al file
-                const studentName = studentInput ? studentInput.value.trim() : `Alunno Senza Nome ${i}`; 
-
+                const studentNamePlaceholder = `Verifica ${i}`; // Usato solo per il messaggio
+                
                 const updateMessage = (msg) => {
-                    messageText.textContent = `[${i}/${numTests}] ${studentName}: ${msg}`;
+                    messageText.textContent = `[${i}/${numTests}] ${studentNamePlaceholder}: ${msg}`;
                 };
 
-                if (studentName) {
-                    try {
-                        const pdfBlob = await generatePDF(studentName, i, professor, classId, updateMessage);
-                        const safeFileName = `Verifica_${classId.replace(/[^a-zA-Z0-9]/g, '_')}_${i}_${studentName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-                        zip.file(safeFileName, pdfBlob);
+                try {
+                    const pdfBlob = await generatePDF(studentNamePlaceholder, i, professor, classId, updateMessage);
+                    // Nome file semplificato
+                    const safeFileName = `Verifica_Reti_${classId.replace(/[^a-zA-Z0-9]/g, '_')}_${i}.pdf`; 
+                    zip.file(safeFileName, pdfBlob);
 
-                    } catch (error) {
-                        messageText.textContent = `Errore critico durante la generazione della verifica ${i}. Controlla la console.`;
-                        console.error(error);
-                        hasError = true;
-                        break;
-                    }
+                } catch (error) {
+                    messageText.textContent = `Errore critico durante la generazione della verifica ${i}. Controlla la console.`;
+                    console.error(error);
+                    hasError = true;
+                    break;
                 }
             }
 
@@ -600,12 +642,6 @@
                 generateBtn.disabled = false;
             }
         }
-
-        // Inizializza gli input degli studenti all'avvio
-        window.onload = function() {
-            updateStudentInputs();
-        };
-
     </script>
 </body>
 </html>
